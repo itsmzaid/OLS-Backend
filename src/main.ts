@@ -21,7 +21,6 @@ async function bootstrap() {
     }),
   );
 
-  // Swagger Configuration
   const config = new DocumentBuilder()
     .setTitle('Authentication API')
     .setDescription('API documentation for Authentication Module')
@@ -31,7 +30,6 @@ async function bootstrap() {
 
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
-  //firebase ;
   const firebaseKeyFilePath = 'src/config/service-account-key.json';
   const firebaseServiceAccount = JSON.parse(
     fs.readFileSync(firebaseKeyFilePath).toString(),
