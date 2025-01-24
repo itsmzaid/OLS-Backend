@@ -3,15 +3,15 @@ import {
   IsEmail,
   IsNotEmpty,
   IsString,
-  Length,
   Matches,
+  Length,
 } from 'class-validator';
 
 export class RegisterUserDto {
   @ApiProperty({ description: "The user's full name" })
   @IsNotEmpty()
   @IsString()
-  Name: string;
+  name: string;
 
   @ApiProperty({ description: "The user's email address" })
   @IsNotEmpty()
@@ -38,4 +38,14 @@ export class RegisterUserDto {
       'Password must contain at least 1 uppercase letter, 1 lowercase letter, and 1 digit',
   })
   password: string;
+
+  // Custom method to format the phone number
+  static formatPhoneNumber(phoneNo: string): string {
+    if (phoneNo.startsWith('03')) {
+      return '+92' + phoneNo.slice(1);
+    } else if (phoneNo.startsWith('3') && phoneNo.length === 10) {
+      return '+92' + phoneNo;
+    }
+    throw new Error('Invalid phone number format');
+  }
 }
