@@ -17,6 +17,7 @@ export class UserService {
         displayName: registerUser.Name,
         email: registerUser.email,
         password: registerUser.password,
+        phoneNumber: registerUser.phoneNo,
       });
       console.log('User Record:', userRecord);
       return userRecord;
