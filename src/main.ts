@@ -3,15 +3,20 @@ import { AppModule } from './app.module';
 import * as dotenv from 'dotenv';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import * as firebaseAdmin from 'firebase-admin';
-import * as fs from 'fs';
+
+import 'src/config/firebase.config';
 
 dotenv.config();
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  app.enableCors();
+  app.enableCors({
+    origin: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -21,28 +26,18 @@ async function bootstrap() {
     }),
   );
 
-  // Swagger Configuration
   const config = new DocumentBuilder()
     .setTitle('Authentication API')
-    .setDescription('API documentation for Authentication Module')
+    .setDescription('API documentation for the Authentication Module')
     .setVersion('1.0')
     .addBearerAuth()
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
-  //firebase ;
-  const firebaseKeyFilePath = 'src/config/service-account-key.json';
-  const firebaseServiceAccount = JSON.parse(
-    fs.readFileSync(firebaseKeyFilePath).toString(),
-  );
-  if (firebaseAdmin.apps.length === 0) {
-    console.log('Initialize Firebase Application.');
-    firebaseAdmin.initializeApp({
-      credential: firebaseAdmin.credential.cert(firebaseServiceAccount),
-    });
-  }
+
   const port = process.env.PORT || 3000;
+
   await app.listen(port);
 
   console.log(`Server is running on http://localhost:${port}`);

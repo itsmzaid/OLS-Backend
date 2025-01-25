@@ -4,7 +4,8 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { RegisterUserDto } from './dto/register-user.dto';
 import * as firebaseAdmin from 'firebase-admin';
 import { LoginDto } from './dto/login.dto';
-import axios from 'axios';
+import { sendPostRequest } from '../utils/http.utils';
+import { validateRequest } from '../utils/auth.utils';
 
 @Injectable()
 export class UserService {
@@ -14,9 +15,10 @@ export class UserService {
     console.log(registerUser);
     try {
       const userRecord = await firebaseAdmin.auth().createUser({
-        displayName: registerUser.Name,
+        displayName: registerUser.name,
         email: registerUser.email,
         password: registerUser.password,
+        phoneNumber: registerUser.phoneNo,
       });
       console.log('User Record:', userRecord);
       return userRecord;
@@ -45,53 +47,15 @@ export class UserService {
 
   private async signInWithEmailAndPassword(email: string, password: string) {
     const url = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${this.apiKey}`;
-    return await this.sendPostRequest(url, {
+    return await sendPostRequest(url, {
       email,
       password,
       returnSecureToken: true,
     });
   }
 
-  private async sendPostRequest(url: string, data: any) {
-    try {
-      const response = await axios.post(url, data, {
-        headers: { 'Content-Type': 'application/json' },
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Error in sendPostRequest:', error.message);
-      throw new HttpException(
-        'Request failed',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
-  }
-
   async validateRequest(req): Promise<boolean> {
-    const authHeader = req.headers['authorization'];
-    if (!authHeader) {
-      console.log('Authorization header not provided.');
-      return false;
-    }
-    const [bearer, token] = authHeader.split(' ');
-    if (bearer !== 'Bearer' || !token) {
-      console.log('Invalid authorization format. Expected "Bearer <token>".');
-      return false;
-    }
-    try {
-      const decodedToken = await firebaseAdmin.auth().verifyIdToken(token);
-      console.log('Decoded Token:', decodedToken);
-      return true;
-    } catch (error) {
-      if (error.code === 'auth/id-token-expired') {
-        console.error('Token has expired.');
-      } else if (error.code === 'auth/invalid-id-token') {
-        console.error('Invalid ID token provided.');
-      } else {
-        console.error('Error verifying token:', error);
-      }
-      return false;
-    }
+    return validateRequest(req);
   }
 
   async refreshAuthToken(refreshToken: string) {
@@ -114,13 +78,14 @@ export class UserService {
       }
     }
   }
+
   private async sendRefreshAuthTokenRequest(refreshToken: string) {
-    const url = `https://securetoken.googleapis.com/v1/token?key=${process.env.APIKEY}`;
+    const url = `https://securetoken.googleapis.com/v1/token?key=${this.apiKey}`;
     const payload = {
       grant_type: 'refresh_token',
       refresh_token: refreshToken,
     };
-    return await this.sendPostRequest(url, payload);
+    return await sendPostRequest(url, payload);
   }
 
   create(createUserDto: CreateUserDto) {
