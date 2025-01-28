@@ -12,7 +12,6 @@ export class UserService {
   private readonly apiKey = process.env.APIKEY;
 
   async registerUser(registerUser: RegisterUserDto) {
-    console.log(registerUser);
     try {
       const userRecord = await firebaseAdmin.auth().createUser({
         displayName: registerUser.name,
@@ -20,11 +19,27 @@ export class UserService {
         password: registerUser.password,
         phoneNumber: registerUser.phoneNo,
       });
-      console.log('User Record:', userRecord);
-      return userRecord;
-    } catch (error) {
-      console.error('Error creating user:', error);
-      throw new Error('User registration failed');
+      return { message: 'User registered successfully', user: userRecord };
+    } catch (error: any) {
+      if (error.errorInfo) {
+        const { code } = error.errorInfo;
+        if (code === 'auth/email-already-exists') {
+          throw new HttpException(
+            'The email address is already in use by another account.',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+        if (code === 'auth/phone-number-already-exists') {
+          throw new HttpException(
+            'The phone number is already in use by another account.',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+      }
+      throw new HttpException(
+        'User registration failed. Please try again later.',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -33,15 +48,38 @@ export class UserService {
     try {
       const { idToken, refreshToken, expiresIn } =
         await this.signInWithEmailAndPassword(email, password);
+
       return { idToken, refreshToken, expiresIn };
     } catch (error: any) {
-      if (error.message.includes('EMAIL_NOT_FOUND')) {
-        throw new Error('User not found.');
-      } else if (error.message.includes('INVALID_PASSWORD')) {
-        throw new Error('Invalid password.');
-      } else {
-        throw new Error(error.message);
+      if (error.response && error.response.data) {
+        const errorCode = error.response.data.error.message;
+
+        if (errorCode === 'EMAIL_NOT_FOUND') {
+          throw new HttpException(
+            'This email is not registered. Please sign up.',
+            HttpStatus.NOT_FOUND,
+          );
+        }
+
+        if (errorCode === 'INVALID_PASSWORD') {
+          throw new HttpException(
+            'Incorrect password. Please try again.',
+            HttpStatus.UNAUTHORIZED,
+          );
+        }
+
+        if (errorCode === 'TOO_MANY_ATTEMPTS_TRY_LATER') {
+          throw new HttpException(
+            'Too many failed login attempts. Please try again later.',
+            HttpStatus.TOO_MANY_REQUESTS,
+          );
+        }
       }
+
+      throw new HttpException(
+        'Login failed. Please try again later.',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 

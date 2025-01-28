@@ -6,11 +6,13 @@ export async function validateRequest(req): Promise<boolean> {
     console.log('Authorization header not provided.');
     return false;
   }
+
   const [bearer, token] = authHeader.split(' ');
   if (bearer !== 'Bearer' || !token) {
     console.log('Invalid authorization format. Expected "Bearer <token>".');
     return false;
   }
+
   try {
     const decodedToken = await firebaseAdmin.auth().verifyIdToken(token);
     console.log('Decoded Token:', decodedToken);
