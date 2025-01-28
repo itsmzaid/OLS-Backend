@@ -83,6 +83,26 @@ export class UserService {
     }
   }
 
+  // user.service.ts
+
+  async logoutUser(token: string) {
+    try {
+      const decodedToken = await firebaseAdmin.auth().verifyIdToken(token); // Verify the token
+      const uid = decodedToken.uid;
+
+      // Revoke the refresh tokens for the user
+      await firebaseAdmin.auth().revokeRefreshTokens(uid);
+
+      return { message: 'User logged out successfully' };
+    } catch (error: any) {
+      console.error('Error logging out user:', error);
+      throw new HttpException(
+        'Logout failed. Please try again later.',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
   private async signInWithEmailAndPassword(email: string, password: string) {
     const url = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${this.apiKey}`;
     return await sendPostRequest(url, {

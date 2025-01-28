@@ -10,6 +10,9 @@ import {
   ValidationPipe,
   UseGuards,
   Query,
+  Req,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -22,6 +25,7 @@ import { AuthGuard } from 'src/guards/auth.guard';
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService) {}
+
   @Post('register')
   @UsePipes(new ValidationPipe({ transform: true }))
   registerUser(@Body() registerUserDTo: RegisterUserDto) {
@@ -64,5 +68,17 @@ export class UserController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.userService.remove(+id);
+  }
+
+  // New logout route
+  @Post('logout')
+  @UseGuards(AuthGuard) // Protect the route with AuthGuard
+  @ApiBearerAuth() // Add BearerAuth to the documentation
+  async logout(@Req() req) {
+    const token = req.headers['authorization']?.split(' ')[1]; // Extract token from Authorization header
+    if (!token) {
+      throw new HttpException('Token not provided', HttpStatus.BAD_REQUEST);
+    }
+    return this.userService.logoutUser(token); // Call the logout service method
   }
 }
