@@ -47,7 +47,7 @@ export class UserService {
     const { email, password } = payload;
     try {
       const { idToken, refreshToken, expiresIn } =
-        await this.signInWithEmailAndPassword(email, password);
+        await this.loginInWithEmailAndPassword(email, password);
 
       return { idToken, refreshToken, expiresIn };
     } catch (error: any) {
@@ -83,14 +83,11 @@ export class UserService {
     }
   }
 
-  // user.service.ts
-
   async logoutUser(token: string) {
     try {
-      const decodedToken = await firebaseAdmin.auth().verifyIdToken(token); // Verify the token
+      const decodedToken = await firebaseAdmin.auth().verifyIdToken(token);
       const uid = decodedToken.uid;
 
-      // Revoke the refresh tokens for the user
       await firebaseAdmin.auth().revokeRefreshTokens(uid);
 
       return { message: 'User logged out successfully' };
@@ -103,7 +100,7 @@ export class UserService {
     }
   }
 
-  private async signInWithEmailAndPassword(email: string, password: string) {
+  private async loginInWithEmailAndPassword(email: string, password: string) {
     const url = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${this.apiKey}`;
     return await sendPostRequest(url, {
       email,
