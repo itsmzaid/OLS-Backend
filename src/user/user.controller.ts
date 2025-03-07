@@ -4,18 +4,15 @@ import {
   Post,
   Body,
   Patch,
-  Param,
   Delete,
   UsePipes,
   ValidationPipe,
   UseGuards,
-  Query,
   Req,
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
 import { UserService } from './user.service';
-import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { RegisterUserDto } from './dto/register-user.dto';
 import { LoginDto } from './dto/login.dto';
@@ -28,8 +25,8 @@ export class UserController {
 
   @Post('register')
   @UsePipes(new ValidationPipe({ transform: true }))
-  registerUser(@Body() registerUserDTo: RegisterUserDto) {
-    return this.userService.registerUser(registerUserDTo);
+  registerUser(@Body() registerUserDto: RegisterUserDto) {
+    return this.userService.registerUser(registerUserDto);
   }
 
   @Post('login')
@@ -38,47 +35,44 @@ export class UserController {
     return this.userService.loginUser(loginDto);
   }
 
-  @Post('refresh-auth')
-  refreshAuth(@Query('refreshToken') refreshToken: string) {
-    return this.userService.refreshAuthToken(refreshToken);
-  }
-
-  @Post()
-  create(@Body() createUserDto: CreateUserDto) {
-    return this.userService.create(createUserDto);
-  }
-
-  @Get()
+  @Get('me')
   @UseGuards(AuthGuard)
   @ApiBearerAuth()
-  findAll() {
-    return this.userService.findAll();
+  async getUser(@Req() req) {
+    console.log('Decoded User from Token:', req.user); // ✅ Debug
+    return this.userService.getUser(req.user.uid);
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.userService.findOne(+id);
+  @Patch()
+  @UseGuards(AuthGuard)
+  @ApiBearerAuth()
+  @UsePipes(new ValidationPipe({ transform: true }))
+  async updateUser(@Req() req, @Body() updateUserDto: UpdateUserDto) {
+    return this.userService.updateUser(req.user.uid, updateUserDto);
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.userService.update(+id, updateUserDto);
+  @Delete()
+  @UseGuards(AuthGuard)
+  @ApiBearerAuth()
+  async deleteUser(@Req() req) {
+    return this.userService.deleteUser(req.user.uid);
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.userService.remove(+id);
-  }
-
-  // New logout route
   @Post('logout')
-  @UseGuards(AuthGuard) // Protect the route with AuthGuard
-  @ApiBearerAuth() // Add BearerAuth to the documentation
+  @UseGuards(AuthGuard)
+  @ApiBearerAuth()
   async logout(@Req() req) {
-    const token = req.headers['authorization']?.split(' ')[1]; // Extract token from Authorization header
-    if (!token) {
-      throw new HttpException('Token not provided', HttpStatus.BAD_REQUEST);
+    const token = req.headers['authorization']?.split(' ')[1];
+    return this.userService.logoutUser(token);
+  }
+  @Post('refresh-token')
+  async refreshToken(@Body('refreshToken') refreshToken: string) {
+    if (!refreshToken) {
+      throw new HttpException(
+        'Refresh token is required',
+        HttpStatus.BAD_REQUEST,
+      );
     }
-    return this.userService.logoutUser(token); // Call the logout service method
+    return this.userService.refreshAuthToken(refreshToken);
   }
 }

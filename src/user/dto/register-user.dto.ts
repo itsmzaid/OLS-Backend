@@ -1,51 +1,27 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  IsEmail,
-  IsNotEmpty,
-  IsString,
-  Matches,
-  Length,
-} from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, Matches } from 'class-validator';
 
 export class RegisterUserDto {
-  @ApiProperty({ description: "The user's full name" })
-  @IsNotEmpty()
-  @IsString()
-  name: string;
-
-  @ApiProperty({ description: "The user's email address" })
+  @ApiProperty({ example: 'abc@gmail.com' })
   @IsNotEmpty()
   @IsEmail()
   email: string;
 
-  @ApiProperty({
-    description: "The user's phone number in the format +923XXXXXXXXX",
-  })
+  @ApiProperty({ example: 'ABC' })
+  @IsString()
   @IsNotEmpty()
-  @Matches(/^\+923\d{9}$/, {
-    message: 'Phone number must start with +923 and be followed by 9 digits',
-  })
-  phoneNo: string;
+  name: string;
 
-  @ApiProperty({
-    description:
-      "The user's password, must include at least 1 uppercase, 1 lowercase, and 1 digit",
-  })
+  @ApiProperty({ example: 'Abcd1234' })
+  @IsString()
   @IsNotEmpty()
-  @Length(8, 20, { message: 'Password must be between 8 and 20 characters' })
-  @Matches(/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)[A-Za-z\d@$!%*?&]{8,20}$/, {
-    message:
-      'Password must contain at least 1 uppercase letter, 1 lowercase letter, and 1 digit',
-  })
   password: string;
 
-  // Custom method to format the phone number
-  static formatPhoneNumber(phoneNo: string): string {
-    if (phoneNo.startsWith('03')) {
-      return '+92' + phoneNo.slice(1);
-    } else if (phoneNo.startsWith('3') && phoneNo.length === 10) {
-      return '+92' + phoneNo;
-    }
-    throw new Error('Invalid phone number format');
-  }
+  @ApiProperty({ example: '+923XXXXXXXXX' })
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^\+92\d{10}$/, {
+    message: 'Phone number must be in +923XXXXXXXXX format',
+  })
+  phoneNo: string;
 }

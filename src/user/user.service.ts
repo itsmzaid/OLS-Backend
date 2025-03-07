@@ -1,5 +1,9 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
-import { CreateUserDto } from './dto/create-user.dto';
+import {
+  Injectable,
+  HttpException,
+  HttpStatus,
+  NotFoundException,
+} from '@nestjs/common';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { RegisterUserDto } from './dto/register-user.dto';
 import * as firebaseAdmin from 'firebase-admin';
@@ -10,17 +14,51 @@ import { validateRequest } from '../utils/auth.utils';
 @Injectable()
 export class UserService {
   private readonly apiKey = process.env.APIKEY;
+  private firestore = firebaseAdmin.firestore();
 
-  async registerUser(registerUser: RegisterUserDto) {
+  async registerUser(registerUserDto: RegisterUserDto) {
+    let formattedPhone = registerUserDto.phoneNo;
+    if (registerUserDto.phoneNo.startsWith('03')) {
+      formattedPhone = '+92' + registerUserDto.phoneNo.substring(1);
+    } else if (registerUserDto.phoneNo.startsWith('3')) {
+      formattedPhone = '+92' + registerUserDto.phoneNo;
+    }
+
     try {
+      const { email, password, name } = registerUserDto;
       const userRecord = await firebaseAdmin.auth().createUser({
-        displayName: registerUser.name,
-        email: registerUser.email,
-        password: registerUser.password,
-        phoneNumber: registerUser.phoneNo,
+        email,
+        password,
+        displayName: name,
+        phoneNumber: formattedPhone,
       });
-      return { message: 'User registered successfully', user: userRecord };
+
+      console.log('✅ User created in Firebase Auth:', userRecord.uid);
+
+      const userDoc = {
+        uid: userRecord.uid,
+        email,
+        name,
+        phoneNo: formattedPhone,
+        createdAt: firebaseAdmin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      await this.firestore.collection('users').doc(userRecord.uid).set(userDoc);
+      console.log('✅ User data saved in Firestore');
+
+      // ✅ Register ke baad user ko login karwa ke token generate karna
+      const { idToken, refreshToken, expiresIn } =
+        await this.loginInWithEmailAndPassword(email, password);
+
+      return {
+        message: 'User registered successfully',
+        user: userDoc,
+        idToken, // ✅ Now returning token
+        refreshToken, // ✅ Returning refresh token as well
+        expiresIn, // ✅ Expiry time of the token
+      };
     } catch (error: any) {
+      console.error('❌ Error in registerUser:', error);
       if (error.errorInfo) {
         const { code } = error.errorInfo;
         if (code === 'auth/email-already-exists') {
@@ -100,6 +138,48 @@ export class UserService {
     }
   }
 
+  async getUser(uid: string) {
+    console.log('Searching User with UID:', uid); // ✅ Debug
+    const user = await this.firestore.collection('users').doc(uid).get();
+
+    if (!user.exists) {
+      console.log('User not found in Firestore'); // Debugging
+      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+    }
+
+    return user.data();
+  }
+
+  async updateUser(uid: string, dto: UpdateUserDto) {
+    const userRef = this.firestore.collection('users').doc(uid);
+    const userDoc = await userRef.get();
+
+    if (!userDoc.exists) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Filter out undefined values to avoid Firestore errors
+    const updatedData = Object.fromEntries(
+      Object.entries(dto).filter(([_, value]) => value !== undefined),
+    );
+
+    if (Object.keys(updatedData).length === 0) {
+      throw new HttpException(
+        'No valid fields provided for update.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    await userRef.update(updatedData);
+    return { message: 'User updated successfully' };
+  }
+
+  async deleteUser(uid: string) {
+    await firebaseAdmin.auth().deleteUser(uid);
+    await this.firestore.collection('users').doc(uid).delete();
+    return { message: 'User deleted successfully' };
+  }
+
   private async loginInWithEmailAndPassword(email: string, password: string) {
     const url = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${this.apiKey}`;
     return await sendPostRequest(url, {
@@ -143,20 +223,12 @@ export class UserService {
     return await sendPostRequest(url, payload);
   }
 
-  create(createUserDto: CreateUserDto) {
-    return 'This action adds a new user';
-  }
-
   findAll() {
     return `This action returns all user`;
   }
 
   findOne(id: number) {
     return `This action returns a #${id} user`;
-  }
-
-  update(id: number, updateUserDto: UpdateUserDto) {
-    return `This action updates a #${id} user`;
   }
 
   remove(id: number) {
