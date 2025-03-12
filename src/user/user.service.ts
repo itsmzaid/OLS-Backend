@@ -46,16 +46,15 @@ export class UserService {
       await this.firestore.collection('users').doc(userRecord.uid).set(userDoc);
       console.log('✅ User data saved in Firestore');
 
-      // ✅ Register ke baad user ko login karwa ke token generate karna
       const { idToken, refreshToken, expiresIn } =
         await this.loginInWithEmailAndPassword(email, password);
 
       return {
         message: 'User registered successfully',
         user: userDoc,
-        idToken, // ✅ Now returning token
-        refreshToken, // ✅ Returning refresh token as well
-        expiresIn, // ✅ Expiry time of the token
+        idToken,
+        refreshToken,
+        expiresIn,
       };
     } catch (error: any) {
       console.error('❌ Error in registerUser:', error);
@@ -139,11 +138,11 @@ export class UserService {
   }
 
   async getUser(uid: string) {
-    console.log('Searching User with UID:', uid); // ✅ Debug
+    console.log('Searching User with UID:', uid);
     const user = await this.firestore.collection('users').doc(uid).get();
 
     if (!user.exists) {
-      console.log('User not found in Firestore'); // Debugging
+      console.log('User not found in Firestore');
       throw new HttpException('User not found', HttpStatus.NOT_FOUND);
     }
 
@@ -158,7 +157,6 @@ export class UserService {
       throw new NotFoundException('User not found');
     }
 
-    // Filter out undefined values to avoid Firestore errors
     const updatedData = Object.fromEntries(
       Object.entries(dto).filter(([_, value]) => value !== undefined),
     );

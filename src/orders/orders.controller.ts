@@ -24,6 +24,20 @@ export class OrdersController {
     return this.ordersService.createOrder(req.user.uid, createOrderDto);
   }
 
+  @Get('pending')
+  async getPendingOrder(@Request() req) {
+    return this.ordersService.getPendingOrder(req.user.uid);
+  }
+
+  @Patch(':orderId/status')
+  async updateOrderStatus(
+    @Request() req,
+    @Param('orderId') orderId: string,
+    @Body('status') status: string,
+  ) {
+    return this.ordersService.updateOrderStatus(req.user.uid, orderId, status);
+  }
+
   @Get()
   async getUserOrders(@Request() req) {
     return this.ordersService.getUserOrders(req.user.uid);

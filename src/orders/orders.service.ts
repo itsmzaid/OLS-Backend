@@ -16,9 +16,6 @@ export class OrdersService {
     this.ordersCollection = this.firestore.collection('orders');
   }
 
-  /**
-   * ✅ Create an order with userId
-   */
   async createOrder(userId: string, createOrderDto: CreateOrderDto) {
     try {
       const {
@@ -36,6 +33,16 @@ export class OrdersService {
         throw new ForbiddenException('User ID is required to place an order.');
       }
 
+      // Delete all previous orders with status "Pending" for this user
+      const pendingOrders = await this.ordersCollection
+        .where('userId', '==', userId)
+        .where('status', '==', 'Pending')
+        .get();
+
+      const batch = this.firestore.batch();
+      pendingOrders.docs.forEach((doc) => batch.delete(doc.ref));
+      await batch.commit();
+
       // Calculate total amount
       const totalAmount = orderItems.reduce(
         (sum, item) => sum + item.price * item.quantity,
@@ -44,18 +51,17 @@ export class OrdersService {
       const deliveryCharges = 150;
       const finalAmount = totalAmount + deliveryCharges;
 
-      // Generate a new order document
       const newOrderRef = this.ordersCollection.doc();
 
-      // Convert DTO to plain object
       const plainOrderItems = orderItems.map((item) => ({
         itemName: item.itemName,
+        serviceName: item.serviceName,
         quantity: item.quantity,
         price: item.price,
       }));
 
       await newOrderRef.set({
-        userId, // ✅ Ensure userId is stored
+        userId,
         userEmail,
         userName,
         userPhoneNo,
@@ -66,7 +72,7 @@ export class OrdersService {
         pickupDate,
         pickupTime,
         address,
-        orderItems: plainOrderItems, // ✅ Store plain object array
+        orderItems: plainOrderItems,
         createdAt: new Date(),
       });
 
@@ -77,9 +83,47 @@ export class OrdersService {
     }
   }
 
-  /**
-   * ✅ Get all orders for a specific user
-   */
+  async getPendingOrder(userId: string) {
+    try {
+      const snapshot = await this.ordersCollection
+        .where('userId', '==', userId)
+        .where('status', '==', 'Pending')
+        .limit(1)
+        .get();
+
+      if (snapshot.empty) {
+        throw new NotFoundException('No pending order found');
+      }
+
+      const orderDoc = snapshot.docs[0];
+      return { orderId: orderDoc.id, ...orderDoc.data() };
+    } catch (error) {
+      console.error('Error fetching pending order:', error);
+      throw new Error('Failed to fetch order');
+    }
+  }
+  async updateOrderStatus(userId: string, orderId: string, status: string) {
+    try {
+      const orderDoc = this.ordersCollection.doc(orderId);
+      const orderSnapshot = await orderDoc.get();
+
+      if (!orderSnapshot.exists) {
+        throw new NotFoundException('Order not found');
+      }
+
+      const orderData = orderSnapshot.data();
+      if (orderData.userId !== userId) {
+        throw new ForbiddenException('You cannot update this order');
+      }
+
+      await orderDoc.update({ status });
+      return { message: `Order status updated to ${status}` };
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      throw new Error('Failed to update order status');
+    }
+  }
+
   async getUserOrders(userId: string) {
     try {
       const snapshot = await this.ordersCollection
@@ -97,9 +141,6 @@ export class OrdersService {
     }
   }
 
-  /**
-   * ✅ Get a specific order by ID
-   */
   async getOrderById(userId: string, orderId: string) {
     try {
       const orderDoc = await this.ordersCollection.doc(orderId).get();
@@ -122,9 +163,6 @@ export class OrdersService {
     }
   }
 
-  /**
-   * ✅ Update order details (only if it belongs to the user)
-   */
   async updateOrder(
     userId: string,
     orderId: string,
@@ -151,9 +189,6 @@ export class OrdersService {
     }
   }
 
-  /**
-   * ✅ Delete an order (only if it belongs to the user)
-   */
   async deleteOrder(userId: string, orderId: string) {
     try {
       const orderDoc = this.ordersCollection.doc(orderId);
