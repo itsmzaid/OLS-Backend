@@ -33,7 +33,6 @@ export class OrdersService {
         throw new ForbiddenException('User ID is required to place an order.');
       }
 
-      // Delete all previous orders with status "Pending" for this user
       const pendingOrders = await this.ordersCollection
         .where('userId', '==', userId)
         .where('status', '==', 'Pending')
@@ -43,7 +42,30 @@ export class OrdersService {
       pendingOrders.docs.forEach((doc) => batch.delete(doc.ref));
       await batch.commit();
 
-      // Calculate total amount
+      const orderCounterRef = this.firestore
+        .collection('orderCounter')
+        .doc('counter');
+      let newOrderNumber: number | undefined;
+
+      await this.firestore.runTransaction(async (transaction) => {
+        const counterDoc = await transaction.get(orderCounterRef);
+
+        if (!counterDoc.exists) {
+          newOrderNumber = 1;
+          transaction.set(orderCounterRef, { lastOrderNumber: newOrderNumber });
+        } else {
+          const lastOrderNumber = counterDoc.data()?.lastOrderNumber || 0;
+          newOrderNumber = lastOrderNumber + 1;
+          transaction.update(orderCounterRef, {
+            lastOrderNumber: newOrderNumber,
+          });
+        }
+      });
+
+      if (newOrderNumber === undefined) {
+        throw new Error('Failed to generate order number');
+      }
+
       const totalAmount = orderItems.reduce(
         (sum, item) => sum + item.price * item.quantity,
         0,
@@ -66,6 +88,7 @@ export class OrdersService {
         userName,
         userPhoneNo,
         status: 'Pending',
+        orderNumber: newOrderNumber,
         totalAmount: finalAmount,
         deliveryCharges,
         paymentMethod,
@@ -76,10 +99,58 @@ export class OrdersService {
         createdAt: new Date(),
       });
 
-      return { message: 'Order created successfully', orderId: newOrderRef.id };
+      return {
+        message: 'Order created successfully',
+        orderId: newOrderRef.id,
+        orderNumber: newOrderNumber,
+      };
     } catch (error) {
       console.error('Error creating order:', error);
       throw new Error('Failed to create order');
+    }
+  }
+
+  async getOrdersByStatus(userId: string, status: string) {
+    try {
+      const userSnapshot = await this.firestore
+        .collection('users')
+        .doc(userId)
+        .get();
+
+      if (!userSnapshot.exists) {
+        return {
+          message: 'User not found',
+          count: 0,
+          orders: [],
+        };
+      }
+
+      const snapshot = await this.ordersCollection
+        .where('userId', '==', userId)
+        .where('status', '==', status)
+        .get();
+
+      if (snapshot.empty) {
+        return {
+          message: 'No orders found for this status',
+          count: 0,
+          orders: [],
+        };
+      }
+
+      const orders = snapshot.docs.map((doc: any) => ({
+        orderNumber: doc.data().orderNumber,
+        status: doc.data().status,
+      }));
+
+      return {
+        message: 'Orders fetched successfully',
+        count: orders.length,
+        orders,
+      };
+    } catch (error) {
+      console.error('Error fetching orders by status:', error);
+      throw new Error('Failed to fetch orders');
     }
   }
 

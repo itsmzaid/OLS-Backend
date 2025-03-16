@@ -48,6 +48,11 @@ export class OrdersController {
     return this.ordersService.getOrderById(req.user.uid, orderId);
   }
 
+  @Get('status/:status')
+  async getOrdersByStatus(@Request() req, @Param('status') status: string) {
+    return this.ordersService.getOrdersByStatus(req.user.uid, status);
+  }
+
   @Patch(':orderId')
   async updateOrder(
     @Request() req,
